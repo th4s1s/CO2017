@@ -65,7 +65,7 @@ struct pcb_t {
 	struct code_seg_t * code;	// Code segment
 	addr_t regs[10]; // Registers, store address of allocated regions
 	uint32_t pc; // Program pointer, point to the next instruction
-	struct page_table_t * page_table; // Page table
+	struct page_table_t * seg_table; // Page table
 	uint32_t bp;	// Break pointer
 	uint32_t prio;
 };

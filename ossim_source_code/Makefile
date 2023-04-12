@@ -56,11 +56,14 @@ test_sched:
 	
 test_os:
 	@echo ----- OS TEST 0 ----------------------------------------------------
-	./os os_0
-	@echo NOTE: Read file output/os_0 to verify your result
+	./os os_mlq_0
+	@echo NOTE: Read file output/os_mlq_0 to verify your result
 	@echo ----- OS TEST 1 ----------------------------------------------------
-	./os os_1
-	@echo NOTE: Read file output/os_1 to verify your result
+	./os os_mlq_1
+	@echo NOTE: Read file output/os_mlq_1 to verify your result
+	@echo ----- OS TEST 2 ----------------------------------------------------
+	./os os_mlq_2
+	@echo NOTE: Read file output/os_mlq_2 to verify your result
 
 $(OBJ)/%.o: %.c ${HEADER}
 	$(MAKE) $(CFLAGS) $< -o $@
