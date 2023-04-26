@@ -105,7 +105,9 @@ addr_t alloc_mem(uint32_t size, struct pcb_t * proc) {
 	 * byte in the allocated memory region to [ret_mem].
 	 * */
 
-	uint32_t num_pages = (size % PAGE_SIZE) ? size / PAGE_SIZE : size / PAGE_SIZE + 1; // Number of pages we will use
+	// uint32_t num_pages = (size % PAGE_SIZE) ? size / PAGE_SIZE : size / PAGE_SIZE + 1; // Number of pages we will use
+	// Above code is wrong since if size % PAGE_SIZE not equals 0 it means that we have to alloacte more pages, not the other way around.
+	uint32_t num_pages = (size % PAGE_SIZE == 0) ? size / PAGE_SIZE : size / PAGE_SIZE + 1;
 	int mem_avail = 0; // We could allocate new memory region or not?
 
 	/* First we must check if the amount of free memory in
@@ -139,38 +141,47 @@ addr_t alloc_mem(uint32_t size, struct pcb_t * proc) {
 		 * 	- Add entries to segment table page tables of [proc]
 		 * 	  to ensure accesses to allocated memory slot is
 		 * 	  valid. */
-		int noAllocatedPages = 0;
+		int numPages = 0;
         int lastPage = -1;
         for (int i = 0; i < NUM_PAGES; i++) {
-            if (_mem_stat[i].proc) continue;
-            _mem_stat[i].proc = proc->pid;
-            _mem_stat[i].index = noAllocatedPages;
-            if (lastPage > -1) {
-                _mem_stat[lastPage].next = i;
-            }
-            lastPage = i;
+            if (_mem_stat[i].proc == 0) {
+				_mem_stat[i].proc = proc->pid;
+				_mem_stat[i].index = numPages;
+				if (lastPage > -1) {
+					_mem_stat[lastPage].next = i;
+				}
+				lastPage = i;
 
-            addr_t v_address = ret_mem + (noAllocatedPages * PAGE_SIZE);
-			addr_t first_lv = get_first_lv(v_address);
-			addr_t second_lv = get_second_lv(v_address);
-			
-            struct trans_table_t * v_trans_table = get_trans_table(first_lv, proc->seg_table);
+				addr_t v_address = ret_mem + (numPages * PAGE_SIZE);
+				addr_t first_lv = get_first_lv(v_address);
+				addr_t second_lv = get_second_lv(v_address);
+				
+				struct page_table_t * v_seg_table = proc->seg_table;
+				struct trans_table_t * v_trans_table = get_trans_table(first_lv, v_seg_table);
 
-            if (!v_trans_table) {
-                proc->seg_table->table[proc->seg_table->size].v_index = first_lv;
-				proc->seg_table->table[proc->seg_table->size].next_lv = malloc(sizeof(struct trans_table_t));
-                v_trans_table = proc->seg_table->table[proc->seg_table->size].next_lv;
-                v_trans_table->size = 0;
-                proc->seg_table->size++;
-            }
-            v_trans_table->table[v_trans_table->size].v_index = second_lv;
-            v_trans_table->table[v_trans_table->size].p_index = i;
-            v_trans_table->size++;
-            if (++noAllocatedPages == num_pages) {
-                _mem_stat[i].next = -1;
-                break;
-            }
+				if (!v_trans_table) {
+					v_seg_table->table[v_seg_table->size].v_index = first_lv;
+					v_seg_table->table[v_seg_table->size].next_lv = malloc(sizeof(struct trans_table_t));
+
+					v_trans_table = v_seg_table->table[v_seg_table->size].next_lv;
+					v_trans_table->size = 0;
+
+					v_seg_table->size++;
+				}
+				v_trans_table->table[v_trans_table->size].v_index = second_lv;
+				v_trans_table->table[v_trans_table->size].p_index = i;
+
+				v_trans_table->size++;
+
+				if (++numPages == num_pages) {
+					_mem_stat[i].next = -1;
+					break;
+				}
+			}
         }
+	puts("---------STATUS OF RAM AFTER ALLOCATION---------");
+	dump();
+	puts("------------------------------------------------");
 	}
 	pthread_mutex_unlock(&mem_lock);
 	return ret_mem;
@@ -191,13 +202,14 @@ int free_mem(addr_t address, struct pcb_t * proc) {
     
     if (translate(virtual_addr, &physical_addr, proc)) {
         addr_t physical_page = physical_addr >> OFFSET_LEN;
+
         while (physical_page != -1) {
             _mem_stat[physical_page].proc = 0;
 
             addr_t first_lv = get_first_lv(virtual_addr);
             addr_t second_lv = get_second_lv(virtual_addr);
-            struct trans_table_t * page_table = NULL;
-            page_table = get_trans_table(first_lv, proc->seg_table);
+
+            struct trans_table_t * page_table = get_trans_table(first_lv, proc->seg_table);
 
             if (page_table == NULL)
                 break;
@@ -211,6 +223,7 @@ int free_mem(addr_t address, struct pcb_t * proc) {
                     break;
                 }
             }
+
             if (page_table->size == 0) {
                 struct page_table_t * seg_table = proc->seg_table;
                 int i = 0;
@@ -230,6 +243,9 @@ int free_mem(addr_t address, struct pcb_t * proc) {
             physical_page = _mem_stat[physical_page].next;
         }
     }
+	puts("--------STATUS OF RAM AFTER DEALLOCATION--------");
+	dump();
+	puts("------------------------------------------------");
 	pthread_mutex_unlock(&mem_lock);
 	return 0;
 }
