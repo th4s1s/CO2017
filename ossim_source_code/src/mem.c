@@ -209,25 +209,23 @@ int free_mem(addr_t address, struct pcb_t * proc) {
             addr_t first_lv = get_first_lv(virtual_addr);
             addr_t second_lv = get_second_lv(virtual_addr);
 
-            struct trans_table_t * page_table = get_trans_table(first_lv, proc->seg_table);
+            struct trans_table_t * v_trans_table = get_trans_table(first_lv, proc->seg_table);
 
-            if (page_table == NULL)
+            if (v_trans_table == NULL)
                 break;
 
-            int i = 0;
-            for (i = 0; i < page_table->size; i++) {
-                if (second_lv == page_table->table[i].v_index) {
-                    page_table->table[i].v_index = -1;
-                    page_table->table[i].p_index = -1;
-                    page_table->table[i] = page_table->table[--page_table->size];
+            for (int i = 0; i < v_trans_table->size; i++) {
+                if (second_lv == v_trans_table->table[i].v_index) {
+                    v_trans_table->table[i].v_index = -1;
+                    v_trans_table->table[i].p_index = -1;
+                    v_trans_table->table[i] = v_trans_table->table[--v_trans_table->size];
                     break;
                 }
             }
 
-            if (page_table->size == 0) {
+            if (v_trans_table->size == 0) {
                 struct page_table_t * seg_table = proc->seg_table;
-                int i = 0;
-                for (i = 0; i < seg_table->size; i++) {
+                for (int i = 0; i < seg_table->size; i++) {
                     if (first_lv == seg_table->table[i].v_index) {
                         int last = seg_table->size - 1;
                         seg_table->table[i] = seg_table->table[last];
